@@ -1,5 +1,9 @@
 Notes on Technologies
 
+Python
+------
+Python 2.7.5 for library compatibility. 
+
 DMX  (lighting control protocol
 -------------------------------
 
