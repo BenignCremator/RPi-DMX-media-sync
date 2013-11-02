@@ -1,6 +1,7 @@
 import sys
 import os.path
-from pygame import mixer, time
+import logging
+from pygame import mixer, time, event
 
 def read_playlist(root_dir):
     playlist = [s.strip() for s in open(root_dir+"/playlist").readlines()]
@@ -11,20 +12,30 @@ def read_playlist(root_dir):
 
 class SoundPlayer(object):
     def __init__(self):
+        logging.basicConfig(filename='SoundPlayer.log', level=logging.DEBUG)
         mixer.init()
         mixer.set_num_channels(8)
-        self.audio_root = "sound_effects/animals"
+        self.audio_root = "../../sound_effects/animals"
         self.playlist = read_playlist(self.audio_root)
         self.sounds = {}
+        
 
     def load(self, sound_id):
+        if sound_id in self.sounds.keys():
+            logging.debug("Tried to load same sound twice. sound_id= %d", sound_id)
+            return
         self.sounds[sound_id] = mixer.Sound(self.audio_root+"/"+self.playlist[sound_id])
         
     def play(self, sound_id):
-            self.sounds[sound_id].play()
-            
+        if sound_id not in self.sounds.keys():
+            logging.debug("Tried to play before loading. sound_id= %d", sound_id)
+            self.load(sound_id)
+        self.sounds[sound_id].play()            
             
     def stop(self, sound_id):
+        if sound_id not in self.sounds.keys():
+            logging.debug("Tried to stop unloaded sound. sound_id= %d", sound_id)
+            self.load(sound_id)
         self.sounds[sound_id].stop()
 
 
