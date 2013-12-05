@@ -29,6 +29,7 @@ fi
 /etc/init.d/rdm_test_server start
 /etc/init.d/rdm_test_server status
 
-ola_patch -d 1 -p 0 -u 1 -i
+ola_patch -d 1 -p 0 -u 0 -i
 ola_dev_info
+ola_dmxmonitor -u 0
 
