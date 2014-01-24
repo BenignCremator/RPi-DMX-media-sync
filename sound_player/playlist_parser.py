@@ -23,8 +23,9 @@ class PlaylistParser (object):
     def __init__(self, path_to_playlist, playlist = "playlist"):
         '''Initialise a parser for a particular root directory '''
         self.root_path = path_to_playlist
-        self.filename = self.root_path + "/" + playlist
-        self.playlist = open(self.filename)  # should check for presence of file
+        self.filename = playlist
+        self.filepath = self.root_path + "/" + self.filename
+        self.playlist = open(self.filepath)  # should check for presence of file
 
     def parse(self):
         '''Process a playlist and return a mapping from index numbers
@@ -79,8 +80,8 @@ class PlaylistParser (object):
             
                 # check for overmatched track
                 if val in self.tracks_map.values():
-                    old = self.overmatched_tracks.get(index, [])
-                    self.overmatched_tracks[index] = old+line_num
+                    old = self.overmatched_tracks.get(val, [])
+                    self.overmatched_tracks[val] = old+[key, line_num]
         
                 # if the rest of the line isn't marked as a comment,
                 # we want to issue a warning
@@ -110,8 +111,8 @@ class PlaylistParser (object):
 
                 # check for overmatched track
                 if val in self.tracks_map.values():
-                    old = self.overmatched_tracks.get(index, [])
-                    self.overmatched_tracks[index] = old+line_num
+                    old = self.overmatched_tracks.get(val, [])
+                    self.overmatched_tracks[val] = old+[(key,line_num)]
 
                 # is this file in the directory?
                 if not val in files:
@@ -123,8 +124,9 @@ class PlaylistParser (object):
                 self.tracks_map[key] = val
         fileset = set(files)
         trackset = set(self.tracks_map.values())
-        self.unmatched = [fileset.difference(trackset)]
-       
+        self.unmatched = list(fileset.difference(trackset))
+        self.unmatched.remove(self.filename)
+
     def report(self):
         '''Issue two reports: a list of files successfully matched to
         index numbers and a list of potential errors. 
@@ -139,4 +141,5 @@ class PlaylistParser (object):
 
 
 
-test_playlist = "/home/jpk/code/wrathskellar/sound_effects/animals/"
+test_playlist = "sample"
+

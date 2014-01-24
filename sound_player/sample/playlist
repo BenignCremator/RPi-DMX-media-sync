@@ -1,0 +1,24 @@
+# Sample Soundwidget playlist
+# Here's a format: index #, filename, everything following is ignored
+# One entry per line
+# Hash indicates comment: everything following a hash is ignored
+# If an index number is repeated, last one wins
+# So something like follows:
+
+1 animals001.wav This is a comment
+2 animals002.wav 
+3 animals003.wav
+  # this is also a comment
+4 animals004.wav
+5 animals005.wav
+6 animals006.wav
+7 animals007.wav
+8 animals008.wav
+5 animals009.wav  Index #5 points to this file, despite the previous
+     		  # definition. 
+
+8 animals.wav
+9 animals001.wav
+
+# Note: this is a suggestion only. 
+
