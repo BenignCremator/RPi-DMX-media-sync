@@ -27,6 +27,10 @@ class PlaylistParser (object):
         self.filepath = self.root_path + "/" + self.filename
         self.playlist = open(self.filepath)  # should check for presence of file
 
+
+    def playlist(self):
+        return Playlist(self.tracks_map, self.root_path)
+
     def parse(self):
         '''Process a playlist and return a mapping from index numbers
         to filenames, as a dictionary
@@ -138,50 +142,94 @@ class PlaylistParser (object):
         To do: something a little less brutal than this would be nice!
         '''
         report_text = ""
-        if len(self.overmatched_indices) > 0:
-            report_text +=("\nSome indices were assigned to more " +
-                           "than one file. See normalised playlist for "+
-                           "actual assignments. Overmatched indices:\n")
-            for key, pair in self.overmatched_indices.items():
-                report_text +="\t".join([str(key), 
-                                         str(pair[0][0]), 
-                                         str(pair[0][1])]) + "\n"
-        if len(self.overmatched_tracks) > 0: 
-            report_text +=("\nSome tracks were assigned to more " +
-            " than one index. This is probably not what you meant to do. " +
-            " Overmatched tracks: \n")
-            for key, pair in self.overmatched_tracks.items():
-                report_text +="\t".join([str(key), 
-                                         str(pair[0][0]), 
-                                         str(pair[0][1])]) +"\n"
-        if len(self.undermatch) >0:
-            report_text += ("\nSome files named in the playlist " +
-            "index were not found in the playlist directory. These " +
-             "files will not play, and references to these index " +
-            "numbers will be silently ignored. You probably want to " + 
-            "fix this. \nUnmatched files: \n")
-            for name, locs in self.undermatch.items():
-                report_text +="\t".join([name,
-                                         ", ".join([str(i) for i in
-                                                    locs])]) +"\n"
-        if len(self.unmarked_comments) > 0:
-
-            report_text += ("\nSome lines were ill-formed. I'm " +
-            "assuming that you meant extra text to be comments, but you "+
-            "might want to review the normalised playlist to make sure "+
-            "it's what you actually wanted.\n")
-            for key, comment in self.unmarked_comments.items():
-                report_text += "\t".join([str(key), comment]) +"\n"
-        if len(self.unmatched) >0:
-
-            report_text += ("\nSome files in the playlist directory were "+
-            "not assigned to any index number. This may be what you "+
-            "meant to do, but you might want to review this list and "+
-            "make sure there's nothing you need here.  \nUnmatched files:\n")
-            
-            report_text +=", ".join(self.unmatched)
-
+        report_text += self.check_overmatched_indices()
+        report_text += self.check_overmatched_tracks()
+        report_text += self.check_undermatch()
+        report_text += self.check_unmarked_comments()
+        report_text += self.check_unmatched()
         return report_text
+
+    def check_overmatched_indices(self):
+        text = ""
+        if len(self.overmatched_indices) > 0:
+            text +=("\nSome indices were assigned to more " +
+                    "than one file. See normalised playlist for "+
+                    "actual assignments. \nOvermatched indices:\n")
+            for key, pair in self.overmatched_indices.items():
+                text +="\t".join([str(key), 
+                                  str(pair[0][0]), 
+                                  str(pair[0][1])]) + "\n"
+        return text
+
+    def check_overmatched_tracks(self):
+        text = ""
+        if len(self.overmatched_tracks) > 0: 
+            text +=("\nSome tracks were assigned to more " +
+                    " than one index. This is probably not what "+ 
+                    "you meant to do." +
+                    " \nOvermatched tracks: \n")
+            for key, pair in self.overmatched_tracks.items():
+                text +="\t".join([str(key), 
+                                  str(pair[0][0]), 
+                                  str(pair[0][1])]) +"\n"
+        return text
+
+    def check_undermatch(self):
+        text = ""
+        if len(self.undermatch) >0:
+            text += ("\nSome files named in the playlist " +
+                     "index were not found in the playlist" +
+                     "directory.  These files will not play, "+ 
+                     "and references to these index " +
+                     "numbers will be silently ignored. " +
+                     "You probably want to " + 
+                     "fix this. \nUnmatched files: \n")
+            for name, locs in self.undermatch.items():
+                text +="\t".join([name,
+                                  ", ".join([str(i) for i in
+                                             locs])]) +"\n"
+        return text
+
+    def check_unmarked_comments(self):
+        text = ""
+        if len(self.unmarked_comments) > 0:
+            text += ("\nSome lines were ill-formed. I'm " +
+                     "assuming that you meant extra text to be" +
+                     " comments, but you might want to review " +
+                     "the normalised playlist to make sure "+
+                     "it's what you actually wanted.\n")
+            for key, comment in self.unmarked_comments.items():
+                text += "\t".join([str(key), comment]) +"\n"
+        return text
+
+    def check_unmatched(self):
+        text = ""
+        if len(self.unmatched) >0:
+            text += ("\nSome files in the playlist directory were "+
+                     "not assigned to any index number. This may " +
+                     "be what you meant to do, but you might want to " +
+                     "review this list and  make sure there's nothing " +
+                     "you need here.  \nUnmatched files:\n") 
+            text +=", ".join(self.unmatched)
+        return text
+
+class Playlist(object):
+    def __init__(self, tracks, root_path):
+        self.tracks = tracks
+        self.root_path = root_path
+
+
+    def track(self, index):
+        if index in tracks.keys():
+            return tracks[index]
+        else:
+            pass         # log an error, please
+
+
+    def tracks_list(self):
+        return tracks.keys()
+
+
 
 test_playlist = "sample"
 
