@@ -62,13 +62,10 @@ class PlaylistParser (object):
 
         for line_num, line in enumerate(self.playlist.readlines()):
             line = line.strip()
-            print line_num, line
             if comment.match(line):
-                print "matched a comment on line %d"%line_num
                 continue            # If this line is a comment, 
                                     # skip it
             elif mapping_with_comment.match(line):
-                print "matched a commented mapping on line %d"%line_num
                 key, val, rest = whitespace.split(line, 2) 
                 key = int(key)      # safe, see regex 
 
@@ -100,7 +97,6 @@ class PlaylistParser (object):
 
 
             elif simple_mapping.match(line):
-                print "matched a simple mapping on line %d"%line_num
                 key,val = whitespace.split(line)
                 key = int(key)
 
@@ -127,19 +123,65 @@ class PlaylistParser (object):
         self.unmatched = list(fileset.difference(trackset))
         self.unmatched.remove(self.filename)
 
+
+
     def report(self):
-        '''Issue two reports: a list of files successfully matched to
-        index numbers and a list of potential errors. 
+        '''Issue a list of problems and potential problems encountered
+        in parsing the playlist.
+    
         Potential errors include
         1) files not matched to index numbers
         2) files defined twice
         3) lines not matching [^\s*[0-9]+\s+\w+\.\w+]|[^\s*\#]
+        etc.
+        
+        To do: something a little less brutal than this would be nice!
         '''
-        pass
+        report_text = ""
+        if len(self.overmatched_indices) > 0:
+            report_text +=("\nSome indices were assigned to more " +
+                           "than one file. See normalised playlist for "+
+                           "actual assignments. Overmatched indices:\n")
+            for key, pair in self.overmatched_indices.items():
+                report_text +="\t".join([str(key), 
+                                         str(pair[0][0]), 
+                                         str(pair[0][1])]) + "\n"
+        if len(self.overmatched_tracks) > 0: 
+            report_text +=("\nSome tracks were assigned to more " +
+            " than one index. This is probably not what you meant to do. " +
+            " Overmatched tracks: \n")
+            for key, pair in self.overmatched_tracks.items():
+                report_text +="\t".join([str(key), 
+                                         str(pair[0][0]), 
+                                         str(pair[0][1])]) +"\n"
+        if len(self.undermatch) >0:
+            report_text += ("\nSome files named in the playlist " +
+            "index were not found in the playlist directory. These " +
+             "files will not play, and references to these index " +
+            "numbers will be silently ignored. You probably want to " + 
+            "fix this. \nUnmatched files: \n")
+            for name, locs in self.undermatch.items():
+                report_text +="\t".join([name,
+                                         ", ".join([str(i) for i in
+                                                    locs])]) +"\n"
+        if len(self.unmarked_comments) > 0:
 
+            report_text += ("\nSome lines were ill-formed. I'm " +
+            "assuming that you meant extra text to be comments, but you "+
+            "might want to review the normalised playlist to make sure "+
+            "it's what you actually wanted.\n")
+            for key, comment in self.unmarked_comments.items():
+                report_text += "\t".join([str(key), comment]) +"\n"
+        if len(self.unmatched) >0:
 
+            report_text += ("\nSome files in the playlist directory were "+
+            "not assigned to any index number. This may be what you "+
+            "meant to do, but you might want to review this list and "+
+            "make sure there's nothing you need here.  \nUnmatched files:\n")
+            
+            report_text +=", ".join(self.unmatched)
 
-
+        return report_text
 
 test_playlist = "sample"
 
