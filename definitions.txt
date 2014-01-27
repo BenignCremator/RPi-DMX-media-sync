@@ -1,0 +1,11 @@
+Terminology
+
+
+
+playlist: a directory containing n <=200 sound files
+playlist index: a file within a playlist defining the mapping from some index numbers ix (ix <=200) to filenames. 
+'master playlist': a list of playlists: a mapping of index numbers ix (ix <= 200) to filesystem paths, where each path chooses a single playlist (this may be handled in config file)
+cue list: a sequence of files, specified as (playlist index, track index). A cue list is an ordered list, its purpose is to specify the order in which a set of tracks should be made available. Cue lists are not required for operation of the widget. 
+'master cue list': a list of cue lists. (allows us, for example, to select cue list 1 for act 1, cue list 2 for act 2, and so forth. 
+
+config file: a text file containing essential information such as locations of master cue lists and master playlists. 
