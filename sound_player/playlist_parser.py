@@ -25,11 +25,11 @@ class PlaylistParser (object):
         self.root_path = path_to_playlist
         self.filename = playlist
         self.filepath = self.root_path + "/" + self.filename
-        self.playlist = open(self.filepath)  # should check for presence of file
+        self.playlist_file = open(self.filepath)  # should check for presence of file
 
 
     def playlist(self):
-        return Playlist(self.tracks_map, self.root_path)
+        return Playlist(self.root_path, self.tracks_map, self.comments)
 
     def parse(self):
         '''Process a playlist and return a mapping from index numbers
@@ -37,8 +37,7 @@ class PlaylistParser (object):
         '''
         import os
         import re
-        os.chdir(self.root_path)
-        files = os.listdir(".")
+        files = os.listdir(self.root_path)
 
         # a line starting with a hash is just a comment
         comment = re.compile('^\s*\#')
@@ -64,7 +63,7 @@ class PlaylistParser (object):
                                    # set off with hash mark
         self.comments = {}      # inline comments, keyed to their lines
 
-        for line_num, line in enumerate(self.playlist.readlines()):
+        for line_num, line in enumerate(self.playlist_file.readlines()):
             line = line.strip()
             if comment.match(line):
                 continue            # If this line is a comment, 
@@ -75,14 +74,11 @@ class PlaylistParser (object):
 
                 # check for overmatched index
                 if self.tracks_map.get(key):
-                    old = self.overmatched_indices.get(key, [])
-                    self.overmatched_indices[key] = old + [(val, line_num)] 
-                                 
-            
+                    self.overmatch_index(key, val, line_num)
+                                             
                 # check for overmatched track
                 if val in self.tracks_map.values():
-                    old = self.overmatched_tracks.get(val, [])
-                    self.overmatched_tracks[val] = old+[key, line_num]
+                    self.overmatch_track(key, val, line_num)
         
                 # if the rest of the line isn't marked as a comment,
                 # we want to issue a warning
@@ -106,13 +102,11 @@ class PlaylistParser (object):
 
                 # check for overmatched index
                 if self.tracks_map.get(key):
-                    old = self.overmatched_indices.get(key, [])
-                    self.overmatched_indices[key] = old + [(val, line_num)] 
+                    self.overmatch_index(key, val, line_num)
 
                 # check for overmatched track
                 if val in self.tracks_map.values():
-                    old = self.overmatched_tracks.get(val, [])
-                    self.overmatched_tracks[val] = old+[(key,line_num)]
+                    self.overmatch_track(key, val, line_num)
 
                 # is this file in the directory?
                 if not val in files:
@@ -127,6 +121,13 @@ class PlaylistParser (object):
         self.unmatched = list(fileset.difference(trackset))
         self.unmatched.remove(self.filename)
 
+    def overmatched_index(self, key, val, line_num):
+        old = self.overmatched_indices.get(key, [])
+        self.overmatched_indices[key] = old + [(val, line_num)] 
+
+    def overmatched_track(self, key, val, line_num):
+        old = self.overmatched_tracks.get(val, [])
+        self.overmatched_tracks[val] = old+[key, line_num]
 
 
     def report(self):
@@ -214,22 +215,45 @@ class PlaylistParser (object):
         return text
 
 class Playlist(object):
-    def __init__(self, tracks, root_path):
+    def __init__(self, root_path, tracks, comments):
         self.tracks = tracks
         self.root_path = root_path
+        self.comments = comments
 
 
     def track(self, index):
         if index in tracks.keys():
-            return tracks[index]
+            return self.tracks[index]
         else:
             pass         # log an error, please
 
 
-    def tracks_list(self):
-        return tracks.keys()
+    def root(self):
+        return self.root_path
+
+    def valid_indices(self):
+        '''Returns a list of valid indices in this playlist'''
+        return self.tracks.keys()
+
+    def track_names(self):
+        '''Returns a list of file names mapped in this playlist'''
+        return self.tracks.values()
+
+    def normalised_index(self):
+        import datetime
+        now = datetime.datetime.now()
+        output =  "#Normalised Index for Playlist %s\n" %self.root_path 
+        output += "#Generated from PlaylistParser %s\n" %str(now)
+        tracks_list = ["\t".join (items) for items in self.list_tracks()]
+        output += "\n".join(self.tracks_list)
+        return output
+
+    def list_tracks(self):
+        return [(str(ix), self.tracks[ix], 
+                self.comments.get(ix, "")) for ix in  self.tracks.keys()]
 
 
-
+ 
+                
 test_playlist = "sample"
 
