@@ -1,50 +1,21 @@
-class PlaylistParser (object):
-    '''Parser for soundwidget playlists. A playlist is an index for a
-    directory of sound tracks, mapping index numbers to file names. 
-    The structure of a playlist file is simple: a sequence of lines
-    consisting of an integer and a file name. A line not consisting of
-    an initial integer followed by a filename in the directory is
-    ignored (an error is reported), and any text following a # comment
-    indicator is ignored (no error is reported on
-    comments). Whitespace is considered a separator (apart from
-    newlines, of course), and is otherwise ignored. (ie, a line may
-    begin with whitespace and any combination of spaces and tabs may
-    separate index number and file name, or follow the file name)
-    The playlist loaded at show time by the sound widget is the one
-    which is called "playlist". The parser parses this file by
-    default, though it can accept an arbitrary file name (for example,
-    to test alternative playlist files, if that should be desired)
-    Note: comments on the same line as a mapping will be reported back
-    in validate mode, in conjunction with the mapping. Comments on
-    their own lines will be lost. 
+class Parser (object):
+    '''Parser for soundwidget file lists (playlists, master playlists,
+    cue lists. 
     '''
 
 
-    def __init__(self, path_to_playlist, playlist = "playlist"):
+    def __init__(self, path_to_root, index_file_name = "playlist"):
         '''Initialise a parser for a particular root directory '''
         import re
-        self.root_path = path_to_playlist
-        self.filename = playlist
-        self.filepath = self.root_path + "/" + self.filename
-        self.playlist_file = open(self.filepath)  # should check for presence of file
+        self.root_path = path_to_root
+        self.index_file_name = index_file_name
+        self.filepath = "/".join([self.root_path, self.index_file_name])
+        self.index_file = open(self.filepath)  # should check for presence of file
         self.res = {}   # regexen used in parsing
-
-        # a line starting with a hash is just a comment
-        self.comment = re.compile('^\s*\#')
-
-        # a mapping without a comment is just index and filename, with
-        # possibly trailing whitespace
-        self.simple_mapping = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s*$)')
-
-        # a commented mapping is an index and a filename, plus stuff
-        self.mapping_with_comment = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s+.*)')
-
-        # compile a whitespace re 
-        self.whitespace = re.compile('\s+')
-        
+        self.parsed = False
 
     def playlist(self):
-        return Playlist(self.root_path, self.tracks_map, self.comments)
+        return Playlist(self.root_path, self.mappings, self.comments)
 
     def parse(self):
         '''Process a playlist and return a mapping from index numbers
@@ -52,23 +23,25 @@ class PlaylistParser (object):
         '''
         import os
         self.files = os.listdir(self.root_path)
-        
+
+        self.define_parse_expressions()
         comment = self.comment
         simple_mapping = self.simple_mapping
         mapping_with_comment = self.mapping_with_comment
         whitespace = self.whitespace
 
-        self.tracks_map = {}    # the track mapping
+        self.mappings = {}    # the mappings from indices to file 
+                              # names or paths
         self.overmatched_indices = {}     # indices matched on 
                                           # more than one line
-        self.overmatched_tracks = {}  # tracks mapped to more than
+        self.overmatched_files = {}  # files mapped to more than
                                       # one index
-        self.undermatch = {}    # tracks mentioned but not present
+        self.undermatch = {}    # files mentioned but not present
         self.unmarked_comments={}  # text parsed as comment but not
                                    # set off with hash mark
         self.comments = {}      # inline comments, keyed to their lines
 
-        for line_num, line in enumerate(self.playlist_file.readlines()):
+        for line_num, line in enumerate(self.index_file.readlines()):
             line = line.strip()
             if comment.match(line):
                 continue            # If this line is a comment, 
@@ -80,7 +53,7 @@ class PlaylistParser (object):
                 register = self.line_with_comment(key, val, rest, line_num)
                 if register:
                     # okay, register the mapping
-                    self.tracks_map[key] = val
+                    self.mappings[key] = val
                     self.comments[key] = rest
 
             elif simple_mapping.match(line):
@@ -89,25 +62,25 @@ class PlaylistParser (object):
                 register = self.simple_line(key,val, line_num)
                 if register:
                     # okay, register the mapping
-                    self.tracks_map[key] = val
+                    self.mappings[key] = val
         self.notice_unmatched_files()
 
 
     def notice_unmatched_files(self):
         fileset = set(self.files)
-        trackset = set(self.tracks_map.values())
+        trackset = set(self.mappings.values())
         self.unmatched = list(fileset.difference(trackset))
-        self.unmatched.remove(self.filename)
+        self.unmatched.remove(self.index_file_name)
 
     def simple_line(self,key,val, line_num):
         '''match a simple line, which is a key and a value'''
         map_this_line = True
                 # check for overmatched index
-        if self.tracks_map.get(key):
+        if self.mappings.get(key):
             self.overmatched_index(key, val, line_num)
 
                 # check for overmatched track
-        if val in self.tracks_map.values():
+        if val in self.mappings.values():
             self.overmatched_track(key, val, line_num)
 
                 # is this file in the directory?
@@ -138,8 +111,8 @@ class PlaylistParser (object):
 
     def overmatched_track(self, key, val, line_num):
         '''This track already indexed. Make a note of it. '''
-        old = self.overmatched_tracks.get(val, [])
-        self.overmatched_tracks[val] = old+[(key, line_num)]
+        old = self.overmatched_files.get(val, [])
+        self.overmatched_files[val] = old+[(key, line_num)]
 
     def undermatched_file(self, key, val, line_num):
         '''This file not found in the playlist directory. 
@@ -162,7 +135,7 @@ class PlaylistParser (object):
         '''
         report_text = ""
         report_text += self.check_overmatched_indices()
-        report_text += self.check_overmatched_tracks()
+        report_text += self.check_overmatched_files()
         report_text += self.check_undermatch()
         report_text += self.check_unmarked_comments()
         report_text += self.check_unmatched()
@@ -180,14 +153,14 @@ class PlaylistParser (object):
                                   str(pair[0][1])]) + "\n"
         return text
 
-    def check_overmatched_tracks(self):
+    def check_overmatched_files(self):
         text = ""
-        if len(self.overmatched_tracks) > 0: 
+        if len(self.overmatched_files) > 0: 
             text +=("\nSome tracks were assigned to more " +
                     " than one index. This is probably not what "+ 
                     "you meant to do." +
                     " \nOvermatched tracks: \n")
-            for key, pair in self.overmatched_tracks.items():
+            for key, pair in self.overmatched_files.items():
                 text +="\t".join([str(key), 
                                   str(pair[0][0]), 
                                   str(pair[0][1])]) +"\n"
@@ -231,6 +204,63 @@ class PlaylistParser (object):
                      "you need here.  \nUnmatched files:\n") 
             text +=", ".join(self.unmatched)
         return text
+
+
+class PlaylistParser (Parser):
+    '''Parser for soundwidget playlists. A playlist is an index for a
+    directory of sound tracks, mapping index numbers to file names. 
+    The structure of a playlist file is simple: a sequence of lines
+    consisting of an integer and a file name. A line not consisting of
+    an initial integer followed by a filename in the directory is
+    ignored (an error is reported), and any text following a # comment
+    indicator is ignored (no error is reported on
+    comments). Whitespace is considered a separator (apart from
+    newlines, of course), and is otherwise ignored. (ie, a line may
+    begin with whitespace and any combination of spaces and tabs may
+    separate index number and file name, or follow the file name)
+    The playlist loaded at show time by the sound widget is the one
+    which is called "playlist". The parser parses this file by
+    default, though it can accept an arbitrary file name (for example,
+    to test alternative playlist files, if that should be desired)
+    Note: comments on the same line as a mapping will be reported back
+    in validate mode, in conjunction with the mapping. Comments on
+    their own lines will be lost. 
+    '''
+    def define_parse_expressions(self):
+        import re
+        # a line starting with a hash is just a comment
+        self.comment = re.compile('^\s*\#')
+
+        # a mapping without a comment is just index and filename, with
+        # possibly trailing whitespace
+        self.simple_mapping = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s*$)')
+
+        # a commented mapping is an index and a filename, plus stuff
+        self.mapping_with_comment = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s+.*)')
+
+        # compile a whitespace re 
+        self.whitespace = re.compile('\s+')
+
+
+
+
+class MasterPlaylistParser (Parser):
+
+    def define_parse_expressions(self):
+        import re
+        # a line starting with a hash is just a comment
+        self.comment = re.compile('^\s*\#')
+
+        # a mapping without a comment is just index and directory, with
+        # possibly trailing whitespace
+        self.simple_mapping = re.compile('(^\s*[0-9]+\s+/?\w+(/\w+)*\s*$)')
+
+        # a commented mapping is an index and a filename, plus stuff
+        self.mapping_with_comment = re.compile('(^\s*[0-9]+\s+/?\w+(/\w+)*\s+.+)')
+
+        # compile a whitespace re 
+        self.whitespace = re.compile('\s+')
+
 
 class Playlist(object):
     def __init__(self, root_path, tracks, comments):
