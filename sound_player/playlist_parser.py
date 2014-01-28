@@ -22,11 +22,26 @@ class PlaylistParser (object):
 
     def __init__(self, path_to_playlist, playlist = "playlist"):
         '''Initialise a parser for a particular root directory '''
+        import re
         self.root_path = path_to_playlist
         self.filename = playlist
         self.filepath = self.root_path + "/" + self.filename
         self.playlist_file = open(self.filepath)  # should check for presence of file
+        self.res = {}   # regexen used in parsing
 
+        # a line starting with a hash is just a comment
+        self.comment = re.compile('^\s*\#')
+
+        # a mapping without a comment is just index and filename, with
+        # possibly trailing whitespace
+        self.simple_mapping = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s*$)')
+
+        # a commented mapping is an index and a filename, plus stuff
+        self.mapping_with_comment = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s+.*)')
+
+        # compile a whitespace re 
+        self.whitespace = re.compile('\s+')
+        
 
     def playlist(self):
         return Playlist(self.root_path, self.tracks_map, self.comments)
@@ -36,23 +51,13 @@ class PlaylistParser (object):
         to filenames, as a dictionary
         '''
         import os
-        import re
-        files = os.listdir(self.root_path)
-
-        # a line starting with a hash is just a comment
-        comment = re.compile('^\s*\#')
-
-        # a mapping without a comment is just index and filename, with
-        # possibly trailing whitespace
-        simple_mapping = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s*$)')
-
-        # a commented mapping is an index and a filename, plus stuff
-        mapping_with_comment = re.compile('(^\s*[0-9]+\s+\w+(\.\w+)?\s+.*)')
-
-        # compile a whitespace re 
-        whitespace = re.compile('\s+')
-
+        self.files = os.listdir(self.root_path)
         
+        comment = self.comment
+        simple_mapping = self.simple_mapping
+        mapping_with_comment = self.mapping_with_comment
+        whitespace = self.whitespace
+
         self.tracks_map = {}    # the track mapping
         self.overmatched_indices = {}     # indices matched on 
                                           # more than one line
@@ -72,62 +77,75 @@ class PlaylistParser (object):
                 key, val, rest = whitespace.split(line, 2) 
                 key = int(key)      # safe, see regex 
 
-                # check for overmatched index
-                if self.tracks_map.get(key):
-                    self.overmatch_index(key, val, line_num)
-                                             
-                # check for overmatched track
-                if val in self.tracks_map.values():
-                    self.overmatch_track(key, val, line_num)
-        
-                # if the rest of the line isn't marked as a comment,
-                # we want to issue a warning
-                if not comment.match(rest):
-                    self.unmarked_comments[line_num]= rest
-                
-                # is this file in the directory?
-                if not val in files:
-                    old = self.undermatch.get(key, [])
-                    self.undermatch[val] =  old + [line_num]
-                    continue
-
-                # okay, register the mapping
-                self.tracks_map[key] = val
-                self.comments[key] = rest
-
+                register = self.line_with_comment(key, val, rest, line_num)
+                if register:
+                    # okay, register the mapping
+                    self.tracks_map[key] = val
+                    self.comments[key] = rest
 
             elif simple_mapping.match(line):
                 key,val = whitespace.split(line)
                 key = int(key)
+                register = self.simple_line(key,val, line_num)
+                if register:
+                    # okay, register the mapping
+                    self.tracks_map[key] = val
+        self.notice_unmatched_files()
 
-                # check for overmatched index
-                if self.tracks_map.get(key):
-                    self.overmatch_index(key, val, line_num)
 
-                # check for overmatched track
-                if val in self.tracks_map.values():
-                    self.overmatch_track(key, val, line_num)
-
-                # is this file in the directory?
-                if not val in files:
-                    old = self.undermatch.get(key,[])
-                    self.undermatch[val] = old + [line_num]
-                    continue
-
-                # okay, register the mapping
-                self.tracks_map[key] = val
-        fileset = set(files)
+    def notice_unmatched_files(self):
+        fileset = set(self.files)
         trackset = set(self.tracks_map.values())
         self.unmatched = list(fileset.difference(trackset))
         self.unmatched.remove(self.filename)
 
+    def simple_line(self,key,val, line_num):
+        '''match a simple line, which is a key and a value'''
+        map_this_line = True
+                # check for overmatched index
+        if self.tracks_map.get(key):
+            self.overmatched_index(key, val, line_num)
+
+                # check for overmatched track
+        if val in self.tracks_map.values():
+            self.overmatched_track(key, val, line_num)
+
+                # is this file in the directory?
+        if not val in self.files:
+            self.undermatched_file(key, val, line_num)
+            map_this_line = False
+        return map_this_line
+
+    def line_with_comment(self,key,val,rest, line_num):
+        '''match a commented line, which is a key, value and anything
+        else we find, which is the comment
+        if the comment is not set off with a hash, make a note and
+        complain
+        either way, save the comment in a separate map'''
+        map_this_line = self.simple_line(key, val, line_num)
+  
+                # if the rest of the line isn't marked as a comment,
+                # we want to issue a warning
+        if not self.comment.match(rest):
+            self.unmarked_comments[line_num]= rest
+        return map_this_line
+
     def overmatched_index(self, key, val, line_num):
+        '''This index already used. Make a note of it. 
+        '''
         old = self.overmatched_indices.get(key, [])
         self.overmatched_indices[key] = old + [(val, line_num)] 
 
     def overmatched_track(self, key, val, line_num):
+        '''This track already indexed. Make a note of it. '''
         old = self.overmatched_tracks.get(val, [])
-        self.overmatched_tracks[val] = old+[key, line_num]
+        self.overmatched_tracks[val] = old+[(key, line_num)]
+
+    def undermatched_file(self, key, val, line_num):
+        '''This file not found in the playlist directory. 
+        Make a note of it.'''
+        old = self.undermatch.get(key,[])
+        self.undermatch[val] = old + [line_num]
 
 
     def report(self):
