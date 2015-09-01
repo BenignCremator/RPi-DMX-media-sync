@@ -25,12 +25,9 @@ if cfg_dir == '':
         del tmp_dir
     else:
         cfg_dir = '/home/olad'
-
-
-
 else:
-    print "Config file "+cfg_file+" missing.  Create config file before running."
-    sys.exit(12)
+    mesg = 'Config file '+cfg_file+' missing.  Create config file before running.'
+    raise ImportError(mesg)
 
 def NewData(data):
   #print data
@@ -49,17 +46,22 @@ def file_import(fileName, filePath = ''):
     Check path and file, imports file and returns objects.
     '''
     if os.path.isfile(filePath+'/'+fileName):
-        tmp_file, extension = fileName[:-3], fileName[-3:]
-        if extension != '.py':
-            mesg = 'Configuration file '+cfg_file+' not a proper configuration file.'
+        if fileName[-3:] == '.py':
+            sys_path=sys.path
+            sys.path=[filePath]
+            exec('import '+fileName[:-3])
+            exec('fileName ='+fileName[:-3])
+            sys.path=sys_path
+            return fileName
+        else:
+            mesg = 'Configuration file '+fileName+' is not properly formatted.'\
+                +'  Check and redit.'
             raise ImportError(mesg)
-        tmpObjects = __import__(tmp_file, fromlist=[filePath])
-        return tmpObects
     else:
-        mesg = 'Configuration file '+fileName+' is missing.  Create configuration'\
-            +' file or specify correct location.'
+        mesg = 'Configuration file '+fileName+' is missing.  Create'\
+            +' configuration file or specify correct location.'
         raise ImportError(mesg)
-    
+
 class SoundPlayer(object):
     def __init__(self):
         logging.basicConfig(filename='SoundPlayer.log', level=logging.DEBUG)
@@ -113,7 +115,7 @@ def test():
     sp.play(1)
     time.wait(t)
 
-
+config = file_import(cfg_file, dfg_dir)
 wrapper = ClientWrapper()
 client = wrapper.Client()
 client.RegisterUniverse(universe, client.REGISTER, NewData)
