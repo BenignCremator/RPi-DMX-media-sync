@@ -65,9 +65,8 @@ Media Players
 -------------
 This leaves the actual media player to deal with.  I was originally going to use
 Xine and pyXine, but I believe that they have an X dependency which will make it
-unusable for a Raspberry Pi.  But I may be wrong about that.  However, while it
-is the largest step, it is also the last part of the project.  There is enough
-here to get started.
+unusable for a Raspberry Pi.  So we have gone with PyGame for their mixer and
+video player.  
 
 Python DMX APIs 
 ---------------
